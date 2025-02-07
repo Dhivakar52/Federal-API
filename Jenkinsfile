@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', credentialsId: 'git-ssh-credentials', url: 'git@github.com:your-org/back-end.git'
+                git branch: 'main', credentialsId: 'git', url: 'git@github.com:your-org/back-end.git'
             }
         }
 
