@@ -6,6 +6,7 @@ const summarizeRouter = require('./routes/summary');
 const flashRouter = require('./routes/flash');
 const peerRouter = require('./routes/peer');
 const morgan = require('morgan');
+const punycode = require('punycode/');
 const app = express();
 const PORT = 5000;
 
