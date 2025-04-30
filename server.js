@@ -23,7 +23,7 @@ app.use(morgan('dev'));
 
 
 
-mongoose.connect('mongodb://myUser:myPass123@127.0.0.1:27017/employee?authSource=admin', {
+mongoose.connect('mongodb://myUser:myPass123@172.31.18.150:27017/employee?authSource=admin', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => {
@@ -55,5 +55,5 @@ app.use('/', employeeLogin);
 // app.use('/form', employeeForm);
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server is running on http://http://3.7.159.205:${PORT}`);
+  console.log(`Server is running on http://3.7.159.205:${PORT}`);
 });
