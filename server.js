@@ -23,7 +23,7 @@ app.use(morgan('dev'));
 
 
 
-mongoose.connect('mongodb://myUser:myPass123@172.31.18.150:27017/employee?authSource=admin', {
+mongoose.connect('mongodb://myUser:myPass123@172.31.18.150:27017/employee?authSource=employee', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => {
