@@ -43,7 +43,7 @@ mongoose.connect('mongodb://myUser:myPass123@172.31.18.150:27017/employee?authSo
 
 
 // Routes
-app.use('/a/trends', trendsRouter);
+app.use('/trends', trendsRouter);
 app.use('/summary', summarizeRouter);
 app.use('/flash', flashRouter);
 app.use('/peer', peerRouter);
