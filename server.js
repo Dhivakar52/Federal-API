@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const trendsRouter = require("./routes/trends");
 const summarizeRouter = require("./routes/summary");
+const fullStory = require("./routes/fullstory");
 const flashRouter = require("./routes/flash");
 const peerRouter = require("./routes/peer");
 const newsRoutes = require("./routes/tubesrcipt");
@@ -45,6 +46,7 @@ mongoose
 // Routes
 app.use("/trends", trendsRouter);
 app.use("/summary", summarizeRouter);
+app.use("/fullstory", summarizeRouter);
 app.use("/flash", flashRouter);
 app.use("/peer", peerRouter);
 app.use("/api", newsRoutes);
