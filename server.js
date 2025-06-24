@@ -23,7 +23,7 @@ app.use(morgan('dev'));
 
 
 
-mongoose.connect('mongodb://dbadm:SrmT1234@127.0.0.1:27017/employee', {
+mongoose.connect('mongodb://dbadm:SrmT1234@127.0.0.1:27017/employee1', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => {
