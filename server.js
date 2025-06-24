@@ -31,10 +31,16 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(morgan("dev"));
 
+const username = 'myUser';
+const password = 'myPass123';
+const dbName = 'employee';
+
 mongoose
   .connect("mongodb://127.0.0.1:27017/employee", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    user: username,
+    pass: password
   })
   .then(() => {
     console.log("Connected to MongoDB");
