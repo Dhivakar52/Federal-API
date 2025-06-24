@@ -31,8 +31,8 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(morgan("dev"));
 
-const username = 'dbadm';
-const password = 'SrmT!234';
+const username = 'myUser';
+const password = 'myPass123';
 const dbName = 'employee';
 
 mongoose
