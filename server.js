@@ -31,17 +31,14 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(morgan("dev"));
 
-mongoose
-  .connect("mongodb://127.0.0.1:27017/employee", {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => {
-    console.log("Connected to MongoDB");
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-  });
+mongoose.connect('mongodb://myUser:myPass123@172.31.18.150:27017/employee', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+}).then(() => {
+  console.log('Connected to MongoDB');
+}).catch((err) => {
+  console.error('MongoDB connection error:', err);
+});
 
 // Routes
 app.use("/trends", trendsRouter);
