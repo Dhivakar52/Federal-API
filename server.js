@@ -21,6 +21,10 @@ const userId= require('./routes/userId');
 const userDelete=  require('./routes/userDelete');
 const userAdd= require('./routes/userAdd');
 
+const protectedRoutes= require('./routes/protectedRoute')
+
+
+
 const morgan = require("morgan");
 const punycode = require("punycode/");
 const app = express();
@@ -46,7 +50,7 @@ mongoose
 // Routes
 app.use("/trends", trendsRouter);
 app.use("/summary", summarizeRouter);
-app.use("/fullstory", summarizeRouter);
+app.use("/fullstory", fullStory);
 app.use("/flash", flashRouter);
 app.use("/peer", peerRouter);
 app.use("/api", newsRoutes);
@@ -64,6 +68,7 @@ app.use("/userDetails", userDetail);
  app.use('/userDetails',userDelete); 
  app.use('/userDetails',userDelete); 
  app.use('/userDetails',userAdd); 
+ app.use('/protectRoutes',protectedRoutes); 
 
  //  For Admin Panel
 // app.use('/form', employeeForm);
