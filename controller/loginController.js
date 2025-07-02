@@ -5,27 +5,36 @@ exports.loginUser = async (req, res) => {
   const { loginId, password } = req.body;
 
   try {
+    console.log("Login Attempt:", loginId);
+
     if (!loginId || !password) {
-      return res
-        .status(400)
-        .json({ message: "Login ID and password are required" });
+      console.log("Missing credentials");
+      return res.status(400).json({ message: "Login ID and password are required" });
     }
 
     const user = await User.findOne({
       $or: [
-        { email: { $regex: new RegExp(`^${loginId}$`, "i") } },
-        { loginId: { $regex: new RegExp(`^${loginId}$`, "i") } },
+        { email: new RegExp(`^${loginId}$`, "i") },
+        { loginId: new RegExp(`^${loginId}$`, "i") },
       ],
     });
 
     if (!user) {
+      console.log("User not found");
       return res.status(400).json({ message: "User not found" });
     }
 
+    console.log("User found:", user.email);
+    console.log("Checking password...");
+
     const isMatch = await user.comparePassword(password);
+
     if (!isMatch) {
+      console.log("Invalid password");
       return res.status(400).json({ message: "Invalid credentials" });
     }
+
+    console.log("Password matched");
 
     user.lastLogin = new Date();
     await user.save();
@@ -41,6 +50,8 @@ exports.loginUser = async (req, res) => {
       expiresIn: process.env.JWT_EXPIRES_IN || "2h",
     });
 
+    console.log("JWT created");
+
     return res.status(200).json({
       message: "Login successful",
       token,
@@ -48,10 +59,10 @@ exports.loginUser = async (req, res) => {
       role: user.role,
       lastLogin: user.lastLogin,
     });
+
   } catch (err) {
-    console.error("Login Error:", err.stack);
-    return res
-      .status(500)
-      .json({ message: "Login failed", error: err.message });
+    console.error("🔥 Login Error:", err.stack);
+    return res.status(500).json({ message: "Login failed", error: err.message });
   }
 };
+
