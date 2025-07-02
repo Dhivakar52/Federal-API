@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const dotenv = require("dotenv");
 const bodyParser = require("body-parser");
 const trendsRouter = require("./routes/trends");
 const summarizeRouter = require("./routes/summary");
@@ -24,7 +25,7 @@ const userAdd= require('./routes/userAdd');
 const protectedRoutes= require('./routes/protectedRoute')
 
 
-
+dotenv.config();
 const morgan = require("morgan");
 const punycode = require("punycode/");
 const app = express();
