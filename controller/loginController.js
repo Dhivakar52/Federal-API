@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/Employee"); // Must match the model export
+const dotenv = require("dotenv");
+dotenv.config();
 
 exports.loginUser = async (req, res) => {
   const { loginId, password } = req.body;
