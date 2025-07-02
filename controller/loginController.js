@@ -1,10 +1,16 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/Employee");
+const User = require("../models/Employee"); // Must match the model export
 
 exports.loginUser = async (req, res) => {
   const { loginId, password } = req.body;
 
   try {
+    if (!loginId || !password) {
+      return res
+        .status(400)
+        .json({ message: "Login ID and password are required" });
+    }
+
     const user = await User.findOne({
       $or: [
         { email: { $regex: new RegExp(`^${loginId}$`, "i") } },
@@ -24,19 +30,17 @@ exports.loginUser = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // ✅ Create JWT token
     const payload = {
       id: user._id,
       email: user.email,
       name: user.name,
       role: user.role,
     };
-    
+
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "2h",
     });
 
-    // ✅ Send token and user info to frontend
     return res.status(200).json({
       message: "Login successful",
       token,
@@ -44,11 +48,10 @@ exports.loginUser = async (req, res) => {
       role: user.role,
       lastLogin: user.lastLogin,
     });
-
   } catch (err) {
-    return res.status(500).json({
-      message: "Error during login",
-      error: err.message,
-    });
+    console.error("Login Error:", err.stack);
+    return res
+      .status(500)
+      .json({ message: "Login failed", error: err.message });
   }
 };
