@@ -55,7 +55,7 @@ app.use("/api", newsRoutes);
 app.use("/privot", privotRoutes);
 app.use("/register", employeeRegister);
 app.use("/logout", employeeLogOut);
-app.use("/", employeeLogin);
+app.use("/login", employeeLogin);
 app.use('/opinion', opinionRouter);
 app.use('/editorial', editorialRouter);
 app.use('/reset-password', resetPassword);
