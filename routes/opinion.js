@@ -24,7 +24,6 @@ const newsSources = {
   "Business Line": "https://www.thehindubusinessline.com/opinion/feeder/default.rss",
   "Mid Day": "https://www.mid-day.com/Resources/midday/rss/opinion.xml",
   "Hans India": "https://www.thehansindia.com/category/hans-opinion/feeds.xml",
-  "Live Hindustan": "https://api.livehindustan.com/feeds/rss/assembly-elections/opinion-polls/rssfeed.xml",
   "Dainik Bhaskar": "https://www.bhaskar.com/rss-v1--category-1944.xml",
   "Greaterkashmir": "https://www.greaterkashmir.com/opinion/feed/",
   "Kashmirlife": "https://kashmirlife.net/category/forum/feed/",
