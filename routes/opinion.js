@@ -15,7 +15,7 @@ const newsSources = {
   "Hindustan Times": "https://www.hindustantimes.com/feeds/rss/opinion/rssfeed.xml",
   "Live Mint": "https://www.livemint.com/rss/opinion",
   "The Print": "https://theprint.in/category/opinion/feed/",
-  "Economic Times": "https://www.gujaratsamachar.com/rss/top-stories",
+  "Economic Times": "https://economictimes.indiatimes.com/opinion/rssfeeds/897228639.cms",
   "The Quint": "https://www.thequint.com/stories.rss?section=opinion",
   "Indian Express": "https://indianexpress.com/section/opinion/feed/",
   "Financial Times": "https://www.ft.com/opinion?format=rss",
