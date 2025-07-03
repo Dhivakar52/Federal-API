@@ -7,25 +7,15 @@ const router = express.Router();
 // Define the RSS feed URLs
 const newsSources = {
   "The Hindu": "https://www.thehindu.com/opinion/editorial/feeder/default.rss",
-  "BBC India": "https://feeds.bbci.co.uk/news/world/asia/india/rss.xml",
-  "Business Line": "https://www.thehindubusinessline.com/feeder/default.rss",
-  "Deccan Chronicle": "https://www.deccanchronicle.com/google_feeds.xml",
-  "Gujarati- Gujarat Samachar": "https://www.gujaratsamachar.com/rss/top-stories",
-  "Hindustan Times": "https://www.hindustantimes.com/feeds/rss/latest/rssfeed.xml",
-  "India Today": "https://www.indiatoday.in/rss/home",
-  "Indian Express": "https://indianexpress.com/section/india/feed",
-  "Live Mint": "https://www.livemint.com/rss/news",
-  "Money Control": "https://www.moneycontrol.com/rss/latestnews.xml",
-  "Manorama - English": "https://www.onmanorama.com/kerala.feeds.onmrss.xml",
-  "NDTV": "https://feeds.feedburner.com/NDTV-LatestNews",
-  "News 18": "https://www.news18.com/commonfeeds/v1/eng/rss/india.xml",
-  "Telangana Today": "https://telanganatoday.com/feed",
-  "The Federal": "https://thefederal.com/feeds.xml",
-  "The Federal Andhra": "https://andhrapradesh.thefederal.com/feeds.xml",
-  "The Federal Desh": "https://desh.thefederal.com/feeds.xml",
-  "The Federal Karnataka": "https://karnataka.thefederal.com/feeds.xml",
-  "The Federal Telangana": "https://telangana.thefederal.com/feeds.xml",
-  "Times of India": "https://timesofindia.indiatimes.com/rssfeedmostrecent.cms"
+  "Hindustan Times": "https://www.hindustantimes.com/feeds/rss/editorials/rssfeed.xml",
+  "Economic Times": "https://economictimes.indiatimes.com/opinion/et-editorial/rssfeeds/3376910.cms",
+  "Indian Express": "https://indianexpress.com/section/opinion/editorials/feed/",
+  "Business Standard": "https://www.business-standard.com/rss/opinion/editorial-10501.rss",
+  "Business Line": "https://www.thehindubusinessline.com/opinion/editorial/feeder/default.rss",
+  "Hans India": "https://www.thehansindia.com/category/hans-opinion-editorial/feeds.xml",
+  "Live Hindustan": "https://api.livehindustan.com/feeds/rss/blog/editorial/rssfeed.xml",
+  "Mathrubhumi": "https://www.mathrubhumi.com/cmlink/rss-feed-1.7275970",
+  "Kashmirlife": "https://kashmirlife.net/category/editorial/feed/",
 };
  
 // Function to fetch and parse RSS feeds
