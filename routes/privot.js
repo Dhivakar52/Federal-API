@@ -1,15 +1,11 @@
 const express = require('express');
-const { OpenAI } = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
 const router = express.Router();
-
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 router.post("/", async (req, res) => {
   try {
@@ -19,27 +15,33 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Input text is required." });
     }
 
-    const prompt = `As a News Desk Editor for The Federal (www.thefederal.com), transform the following press release into a news article. The article should be objective, well-structured, and maintain journalistic standards. If the target language is not English, translate it appropriately while preserving context, accuracy, and cultural nuances.
+    const prompt = `As a News Desk Editor for The Federal (www.thefederal.com), transform the following press release into a news article. 
+The article should be objective, well-structured, and maintain journalistic standards. 
+If the target language is not English, translate it appropriately while preserving context, accuracy, and cultural nuances.
 
-    Press Release:
-    ${input}
+Press Release:
+${input}
 
-    Target Language: ${selectedLanguage}
+Target Language: ${selectedLanguage}
 
-    Please provide a news article that:
-    1. Has a clear headline
-    2. Follows news writing best practices
-    3. Maintains objectivity
-    4. Includes relevant context
-    5. Generate hashtags and relevant SEO-focused keywords
-    6. Is written in ${selectedLanguage} with proper cultural context`;
+Please provide a news article that:
+1. Has a clear headline
+2. Follows news writing best practices
+3. Maintains objectivity
+4. Includes relevant context
+5. Generates hashtags and relevant SEO-focused keywords
+6. Is written in ${selectedLanguage} with proper cultural context`;
 
-    const completion = await openai.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "gpt-4o-mini",
-    });
+    // Initialize the Gemini model
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    res.json({ output: completion.choices[0]?.message?.content || "" });
+    // Generate content
+    const result = await model.generateContent(prompt);
+
+    // Extract text from Gemini response
+    const article = result.response.text();
+
+    res.json({ output: article });
   } catch (error) {
     console.error("Error generating article:", error);
     res.status(500).json({ error: "Failed to generate article." });

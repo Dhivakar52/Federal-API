@@ -43,7 +43,7 @@ router.post('/', async (req, res) => {
     console.log('Paragraphs:', paragraphs);
 
     // Create the prompt for the summarization model
-    const prompt = `Summarize the following news article ${selectedLanguage} in about 200 words:\n\n${paragraphs}\n\n`;
+    const prompt = `Summarize the following news article ${selectedLanguage} in give full content:\n\n${paragraphs}\n\n`;
 
     // Call the OpenAI API for summarization
     const aiResponse = await openai.chat.completions.create({

@@ -1,14 +1,11 @@
 const express = require('express');
-const { OpenAI } = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
 const router = express.Router();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 router.post('/generate-news', async (req, res) => {
   try {
@@ -19,32 +16,30 @@ router.post('/generate-news', async (req, res) => {
     }
 
     const systemPrompt = `You are a professional news writer fluent in ${language}. Follow journalistic standards strictly:
-    1. Use proper script and grammar.
-    2. Do not mix languages.`;
+1. Use proper script and grammar.
+2. Do not mix languages.`;
 
     const userPrompt = `Generate a news story in ${language}:
-    Title: ${title}
-    Description: ${description}
-    Transcript: ${transcript}
+Title: ${title}
+Description: ${description}
+Transcript: ${transcript}
 
-    Format:
-    HEADLINE: (headline)
-    BODY: (article)
-    HASHTAGS: (hashtags)`;
+Format:
+HEADLINE: (headline)
+BODY: (article)
+HASHTAGS: (hashtags)`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 800,
+    // Initialize Gemini model
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // Generate content
+    const result = await model.generateContent({
+      contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }]
     });
 
-    const generatedContent = response.choices[0]?.message?.content;
+    const generatedContent = result.response.text();
     if (!generatedContent) {
-      return res.status(500).json({ error: 'No content received from OpenAI' });
+      return res.status(500).json({ error: 'No content received from Gemini' });
     }
 
     // Extract news details using regex
@@ -53,7 +48,7 @@ router.post('/generate-news', async (req, res) => {
     const hashtagsMatch = generatedContent.match(/HASHTAGS:\s*(.*?)$/s);
 
     if (!headlineMatch || !bodyMatch || !hashtagsMatch) {
-      return res.status(500).json({ error: 'Invalid response format from OpenAI' });
+      return res.status(500).json({ error: 'Invalid response format from Gemini' });
     }
 
     res.json({
@@ -66,8 +61,8 @@ router.post('/generate-news', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error generating news:', error);
-    res.status(500).json({ error: 'Failed to generate news. Please try again.' });
+    console.error('Gemini News Generator Error:', error);
+    res.status(500).json({ error: 'Failed to generate news. Please try again.', details: error.message });
   }
 });
 

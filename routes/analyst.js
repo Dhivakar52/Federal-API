@@ -1,19 +1,10 @@
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
-const { OpenAI } = require('openai');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const router = express.Router();
-
-const app = express();
-
-
-const openai = new OpenAI({
-  apiKey: process.env['OPENAI_API_KEY'],
-   baseURL: "https://api.openai.com/v1"
-});
-
-
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const USER_NEEDS_PROMPT = `
 You are a media analyst. Analyze the following news story using the User Needs 2.0 framework.
@@ -35,44 +26,51 @@ const extractArticleText = async (url) => {
   try {
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
-    const paragraphs = $('p').map((i, el) => $(el).text()).get();
-    return paragraphs.join(' ').trim();
+    const paragraphs = $("p").map((i, el) => $(el).text()).get();
+    const article = paragraphs.join(" ").trim();
+    console.log("Extracted article length:", article.length);
+    return article;
   } catch (error) {
+    console.error("Error extracting article:", error.message);
     return null;
   }
 };
 
-router.post('/', async (req, res) => {
+router.post("/", async (req, res) => {
   const { url } = req.body;
 
-  if (!url || !url.startsWith('http')) {
-    return res.status(400).json({ error: 'Invalid URL' });
+  console.log("Received URL:", url);
+
+  if (!url || !url.startsWith("http")) {
+    return res.status(400).json({ error: "Invalid URL" });
   }
 
   const article = await extractArticleText(url);
   if (!article || article.length < 300) {
-    return res.status(400).json({ error: 'Could not extract meaningful content.' });
+    return res.status(400).json({
+      error: "Could not extract meaningful content. Article too short or empty.",
+    });
   }
 
-  const prompt = USER_NEEDS_PROMPT.replace('{story}', article.slice(0, 3000));
+  const prompt = USER_NEEDS_PROMPT.replace("{story}", article.slice(0, 3000));
 
   try {
-    const chatResponse = await openai.chat.completions.create({
-       model: "gpt-4o-mini",
-      messages: [
-        { role: 'system', content: 'You are a helpful media analyst.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7
-    });
+    console.log("Sending prompt to Gemini...");
 
-    const result = chatResponse.choices[0].message.content;
-    res.json({ response: result });
+    // Correct Gemini call
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent(prompt);
+
+    const text = result.response.text();
+    console.log("Gemini response received.");
+    res.json({ response: text });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'OpenAI request failed' });
+    console.error("Gemini API error full:", err);
+    res.status(500).json({
+      error: "Gemini request failed",
+      details: err?.message,
+    });
   }
 });
-
 
 module.exports = router;

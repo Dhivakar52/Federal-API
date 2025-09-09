@@ -1,18 +1,9 @@
 const express = require("express");
 const axios = require("axios");
-const cheerio = require("cheerio");
-const { OpenAI } = require('openai');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const router = express.Router();
-
-const app = express();
-
-
-const openai = new OpenAI({
-  apiKey: process.env['OPENAI_API_KEY'],
-   baseURL: "https://api.openai.com/v1"
-});
-
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const seoPromptTemplates = {
   "Analyze the SEO performance of this article.": `
@@ -62,7 +53,7 @@ async function extractArticle(url) {
     return matches
       .map((p) => p.replace(/<[^>]+>/g, "").trim())
       .filter(Boolean)
-     .join("\n\n") 
+      .join("\n\n")
       .slice(0, 5000);
   } catch (error) {
     console.error("Error fetching article:", error.message);
@@ -76,28 +67,26 @@ router.post("/", async (req, res) => {
 
   const content = await extractArticle(url);
   console.log("Extracted content length:", content);
+
   if (!content) {
     return res.status(400).json({ error: "Could not extract article content." });
   }
 
   const template = seoPromptTemplates[promptType] || `Analyze this article:\n\n{content}`;
-  
   const finalPrompt = template.replace("{content}", content);
 
   try {
-    const response = await openai.chat.completions.create({
-       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You are an expert SEO assistant." },
-        { role: "user", content: finalPrompt },
-      ],
-    });
+    // Initialize Gemini model
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const reply = response.choices[0].message.content;
+    // Generate SEO analysis content
+    const result = await model.generateContent(finalPrompt);
+    const reply = result.response.text();
+
     res.json({ reply });
   } catch (error) {
-    console.error("OpenAI Error:", error.response?.data || error.message);
-    res.status(500).json({ error: "OpenAI error" });
+    console.error("Gemini API Error:", error);
+    res.status(500).json({ error: "Gemini API error", details: error.message });
   }
 });
 
