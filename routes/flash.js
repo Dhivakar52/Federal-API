@@ -39,8 +39,8 @@ async function createFlashcards(content) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Gemini takes plain text instead of role-based messages
-    const inputText = `
-${prompt}
+      const inputText = `
+         ${prompt}
 
 Here is the article content:
 ${content}
