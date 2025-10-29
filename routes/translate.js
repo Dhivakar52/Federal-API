@@ -3,20 +3,16 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const cheerio = require("cheerio");
-const { OpenAI } = require("openai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const openai = new OpenAI({
-  apiKey: process.env['OPENAI_API_KEY'],
-   baseURL: "https://api.openai.com/v1"
-});
-
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env['GEMINI_API_KEY']);
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
 // Function to extract article content
 async function extractArticle(url) {
   const { data } = await axios.get(url);
-
   const $ = cheerio.load(data);
-
 
   const title = $("title").first().text();
   const description =
@@ -24,32 +20,17 @@ async function extractArticle(url) {
     $('meta[property="og:description"]').attr("content") ||
     "";
 
-  // const paragraphs = $("p")
-  //   .map((_, el) => $(el).text())
-  //   .get()
-  //   .join("\n\n");
-    const htmlContent = $("h1, h2, h3, h4, h5, h6, p,div,span")
+  const htmlContent = $("h1, h2, h3, h4, h5, h6, p, div, span")
     .map((_, el) => $(el).text())
     .get()
     .join("\n");
-    console.log(htmlContent)
 
   return { title, description, text: htmlContent };
 }
 
-
-
-
-
-
-
-
-
-// Function to translate text using OpenAI
+// Function to translate text using Gemini
 async function translateText(text, language) {
-  // const prompt = `Translate the following article into ${language} language fully . I want all tags inside the data  separate the p tag and h1 to h6 content in new-line.But I dont html tags inside the contents .  Only provide the translated version. No explanation. No additional content:\n\n${text}`;
-
-const prompt = `
+  const prompt = `
 Translate the following article into ${language}.
 - Do not include any HTML tags.
 - For headings (h1-h6), place them on a separate line.
@@ -57,18 +38,12 @@ Translate the following article into ${language}.
 - Do not explain anything. Only return the translated and structured content.
 
 Here is the content:
-\n\n${text}
+${text}
 `;
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: "You are a translator." },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.3,
-  });
 
-  return response.choices[0].message.content.trim();
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  return response.text().trim();
 }
 
 // POST /translate
@@ -83,7 +58,6 @@ router.post("/", async (req, res) => {
     const translatedDesc = await translateText(description, targetLanguage);
     const translatedText = await translateText(text, targetLanguage);
 
-    // Return only translated content — no file download
     res.json({
       title: translatedTitle,
       description: translatedDesc,

@@ -14,17 +14,18 @@ const privotRoutes = require("./routes/privot");
 const employeeRegister = require("./routes/register");
 const employeeLogin = require("./routes/login");
 const employeeLogOut = require("./routes/logout");
-const opinionRouter = require("./routes/opinion");
-const editorialRouter = require("./routes/editorial");
-const resetPassword = require("./routes/reset_password");
-const translateRouter = require("./routes/translate");
-
+const opinionRouter = require('./routes/opinion');
+const editorialRouter = require('./routes/editorial');
+const resetPassword = require('./routes/reset_password');
+const translateRouter = require('./routes/translate');
+const tubeTwoRoutes= require('./routes/tubetwo');
 const userDetail = require("./routes/userDetail");
-const userId = require("./routes/userId");
-const userDelete = require("./routes/userDelete");
-const userAdd = require("./routes/userAdd");
+const userId= require('./routes/userId');
+const userDelete=  require('./routes/userDelete');
+const userAdd= require('./routes/userAdd');
 
-const protectedRoutes = require("./routes/protectedRoute");
+const protectedRoutes= require('./routes/protectedRoute')
+
 
 const morgan = require("morgan");
 const punycode = require("punycode/");
@@ -60,22 +61,27 @@ app.use("/privot", privotRoutes);
 app.use("/register", employeeRegister);
 app.use("/logout", employeeLogOut);
 app.use("/", employeeLogin);
-app.use("/opinion", opinionRouter);
-app.use("/editorial", editorialRouter);
-app.use("/reset-password", resetPassword);
-app.use("/translate", translateRouter);
+app.use('/opinion', opinionRouter);
+app.use('/editorial', editorialRouter);
+app.use('/reset-password', resetPassword);
+app.use('/tubetwo', tubeTwoRoutes);
+
+app.use('/translate', translateRouter);
 //  For Admin Panel
 
 app.use("/userDetails", userDetail);
-app.use("/userDetails", userId);
-app.use("/userDetails", userDelete);
-app.use("/userDetails", userDelete);
-app.use("/userDetails", userAdd);
-app.use("/protectRoutes", protectedRoutes);
+  app.use("/userDetails",userId);
+ app.use('/userDetails',userDelete); 
+ app.use('/userDetails',userDelete); 
+ app.use('/userDetails',userAdd); 
+ app.use('/protectRoutes',protectedRoutes); 
 
-//  For Admin Panel
+
+
+ //  For Admin Panel
 // app.use('/form', employeeForm);
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
+
