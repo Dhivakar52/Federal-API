@@ -1,67 +1,82 @@
-const express = require('express');
-const axios = require('axios');
-const { OpenAI } = require('openai');
-const dotenv = require('dotenv');
-const cheerio = require('cheerio');
-
-dotenv.config();
+const express = require("express");
+const axios = require("axios");
+const cheerio = require("cheerio");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const router = express.Router();
-const openai = new OpenAI({
-  apiKey: process.env['OPENAI_API_KEY'],
-});
 
+/* ✅ Gemini init */
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+/* ================= LANGUAGE MAP ================= */
 const languagePrompts = {
-  Hindi: 'in Hindi',
-  English: 'in English',
-  Telugu: 'in Telugu',
-  Kannada: 'in Kannada',
-  Marathi: 'in Marathi',
-  Bengali: 'in Bengali',
-  Tamil: 'in Tamil',
-  Gujarati: 'in Gujarati',
-  Malayalam: 'in Malayalam',
+  Hindi: "in Hindi",
+  English: "in English",
+  Telugu: "in Telugu",
+  Kannada: "in Kannada",
+  Marathi: "in Marathi",
+  Bengali: "in Bengali",
+  Tamil: "in Tamil",
+  Gujarati: "in Gujarati",
+  Malayalam: "in Malayalam",
 };
 
-router.post('/', async (req, res) => {
+/* ================= API ================= */
+router.post("/", async (req, res) => {
   const { url, language } = req.body;
-  console.log(url);
-  
-  // Validate language
-  const selectedLanguage = languagePrompts[language] || 'in Hindi'; // Default to Hindi if language is invalid
+
+  if (!url) {
+    return res.status(400).json({ error: "URL is required" });
+  }
+
+  const selectedLanguage = languagePrompts[language] || "in Hindi";
 
   try {
-    // Fetch the URL content
-    const response = await axios.get(url, { timeout: 5000 });
+    /* 🔹 Fetch article */
+    const response = await axios.get(url, { timeout: 8000 });
     const html = response.data;
     const $ = cheerio.load(html);
 
-    const title = $('title').text();
-    const paragraphs = $('p').map((i, el) => $(el).text()).get().join('\n');
+    const title = $("title").text();
 
-    console.log('Title:', title);
-    console.log('Paragraphs:', paragraphs);
+    const paragraphs = $("p")
+      .map((_, el) => $(el).text())
+      .get()
+      .join("\n\n")
+      .slice(0, 6000); // Gemini-safe length
 
-    // Create the prompt for the summarization model
-    const prompt = `Summarize the following news article ${selectedLanguage} in give full content:\n\n${paragraphs}\n\n`;
+    if (!paragraphs) {
+      return res.status(400).json({ error: "No article content found" });
+    }
 
-    // Call the OpenAI API for summarization
-    const aiResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // You can switch to gpt-3.5-turbo for faster response times
-      messages: [
-        { role: 'system', content: `You are a skilled news summarizer. Summarize the content ${selectedLanguage}.` },
-        { role: 'user', content: prompt },
-      ],
+    /* 🔹 Prompt */
+    const prompt = `
+Summarize the following news article ${selectedLanguage}.
+Provide full, well-structured content without missing key details.
+
+${paragraphs}
+`;
+
+    /* 🔹 Gemini model */
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
     });
 
-    const summary = aiResponse.choices[0].message.content;
-    res.json({ summary, title, language: language || 'Hindi' });
+    const result = await model.generateContent(prompt);
+    const summary = result.response.text();
+
+    res.json({
+      title,
+      summary,
+      language: language || "Hindi",
+    });
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: error.message });
+    console.error("Gemini Summary Error:", error.message);
+    res.status(500).json({
+      error: "Failed to summarize article",
+      details: error.message,
+    });
   }
 });
-
-
 
 module.exports = router;
