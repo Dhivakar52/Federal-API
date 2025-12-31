@@ -7,42 +7,102 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const seoPromptTemplates = {
   "Analyze the SEO performance of this article.": `
-Analyze the SEO performance of the following article. Evaluate:
-- Title & meta description
-- Headers structure
-- Keyword usage
-- Links
-- Image SEO
-- Readability
-- Schema markup (if applicable)
+You are an SEO strategist. Analyze the SEO performance of the given article in a structured, professional report format — exactly like this example.
 
-Then give actionable suggestions to improve SEO performance.
+Each section must begin with an underlined title (use Markdown underline with double underscores like __Title__).  
+Maintain professional tone, clarity, and formatting with one blank line between sections.
 
-{content}`,
+Follow this exact section order and depth:
+
+__1. URL / Permalink / Slug__  
+[Analyze if the URL is descriptive, keyword-rich, too long, or includes unnecessary elements like dates. Suggest a concise, SEO-friendly slug.]
+
+__2. Title & Headings__  
+[Evaluate the H1 title for keyword focus, readability, and CTR potential. Analyze use of H2 and H3 tags, hierarchy, keyword inclusion, and clarity.]
+
+__3. Keyword Targeting & Density__  
+[Identify primary and secondary keywords. Discuss keyword placement, relevance, and missed opportunities. Suggest better long-tail keyword use.]
+
+__4. Meta Title & Meta Description / Snippet__  
+[Assess current meta title and description. Suggest optimized versions within ideal character limits. Ensure focus on primary keywords and CTR.]
+
+__5. Internal & External Linking__  
+[Evaluate presence and quality of internal/external links. Mention anchor text optimization and relevance. Suggest improvements.]
+
+__6. Content Depth, Readability & Engagement__  
+[Analyze structure, sentence length, tone, depth, and engagement. Discuss scannability and authority-building potential.]
+
+__7. Image ALT Text / Multimedia__  
+[Check if images exist and whether ALT tags, captions, and filenames are optimized. Suggest improvements.]
+
+__8. Schema / Structured Data Opportunities__  
+[Check for schema presence (Article, NewsArticle, Breadcrumb). Recommend suitable schema markup types and key properties.]
+
+__9. Page Speed, Mobile Experience & Technical SEO__  
+[Provide general guidance on image compression, lazy loading, responsive design, canonical tags, and Core Web Vitals.]
+
+__10. Social / Visibility / Sharing__  
+[Assess Open Graph tags, Twitter Cards, and shareability. Suggest CTAs or improvements for social visibility.]
+
+__11. Strengths vs Weaknesses Summary__  
+[List clear strengths and weaknesses in bullet or table-like format.]
+
+__12. Actionable Checklist / Recommendations__  
+[List step-by-step, numbered SEO improvements based on your analysis.]
+
+
+__13. Checklist Summary__
+- Ensure keywords are present in Strap Lines
+- Make sure keywords are present in the URL
+- Ensure to include keywords in Heading tags like H1, H2, or H3 tags, etc.,
+- Have keywords placed in ALT tags for all images
+- Add Related Links for each article
+- Add keywords in a 2-line snippet of the article.
+- Maintain core keywords density with 2-3% in content
+- Add related keywords between the content
+- Need to add minimum 2 tags under each article
+- Articles to be posted under the right sections.
+- Important articles need to be listed on Home/Section pages
+- Author info (Name were linked to their respective Author Bio page)
+- Ensure articles are shared in Social Media (especially on Twitter – Google now showcases in results):
+[List step-by-step, numbered SEO improvements based on your Checklist Summary analysis.]
+
+
+Now, analyze this article and generate the full SEO report in the same style and structure:
+
+{content}
+`,
+
   "Optimize the meta description for this content.": `
-Based on the following article content, write an SEO-optimized meta description:
+Based on the following article, write an SEO-optimized meta description:
 - Keep it under 160 characters
 - Include the main keyword(s)
-- Make it compelling and relevant to improve click-through rate (CTR)
+- Make it compelling to improve CTR
 
-{content}`,
+{content}
+`,
+
   "Provide tips to improve readability for this piece.": `
-Analyze the readability of the following article content. Identify any issues and suggest clear, actionable improvements:
-- Use simpler language or sentence structure
-- Break up long paragraphs
+Analyze the readability of the article below. Give specific, actionable improvements:
+- Simplify long sentences
+- Break up dense paragraphs
 - Add headings or bullet points where needed
-- Ensure the tone and flow are easy to follow
+- Maintain a natural tone and logical flow
 
-{content}`,
+{content}
+`,
+
   "Suggest SEO friendly headlines for the story": `
-Based on the article below, generate 5 SEO-friendly, engaging headlines:
-- Include relevant keywords
+Based on the article below, generate 5 SEO-friendly headlines:
 - Each headline should be under 60 characters
-- Make them click-worthy but accurate
-- Avoid clickbait; reflect the article content clearly
+- Include relevant keywords
+- Make them catchy but accurate (avoid clickbait)
 
-{content}`,
+{content}
+`,
 };
+
+
 
 // 🔍 Extract text from article
 async function extractArticle(url) {
