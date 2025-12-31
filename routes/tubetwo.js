@@ -2,7 +2,7 @@
 const express = require('express');
 const ytdlp = require('yt-dlp-exec');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const router = express.Router();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -37,23 +37,51 @@ function chunkTranscript(segments, maxChars = 5000) {
   return chunks;
 }
 
+// Utility: Fetch YouTube video info using YouTube Data API as fallback
+async function fetchVideoInfoFallback(videoId) {
+  try {
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    if (!apiKey) return { title: 'Video info unavailable', description: '' };
+
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.items && data.items.length > 0) {
+      const snippet = data.items[0].snippet;
+      return {
+        title: snippet.title || 'No title',
+        description: (snippet.description || 'No description').replace(/https?:\/\/\S+/g,'').replace(/#\w+/g,'').trim()
+      };
+    }
+    return { title: 'Video info unavailable', description: '' };
+  } catch (err) {
+    console.error('YouTube Data API fetch failed:', err.message);
+    return { title: 'Video info unavailable', description: '' };
+  }
+}
+
 // POST /tubetwo
 router.post('/', async (req,res) => {
   try {
     const { youtubeUrl, language = 'English', applyCleaning = true } = req.body;
     if (!youtubeUrl) return res.status(400).json({ error: 'YouTube URL required' });
 
-    const videoId = youtubeUrl.split('v=')[1]?.split('&')[0];
+    const videoId = youtubeUrl.split('v=')[1]?.split('&')[0] || youtubeUrl.split('youtu.be/')[1]?.split('?')[0];
     if (!videoId) return res.status(400).json({ error: 'Invalid YouTube URL' });
 
-    // 1️⃣ Fetch video info
+    // 1️⃣ Fetch video info (yt-dlp primary, fallback to YouTube Data API)
     let info;
-    try { info = await ytdlp(youtubeUrl,{ dumpJson: true }); } 
-    catch(err){ console.error('Video info fetch error:', err); return res.status(500).json({error:'Failed to fetch video info'}); }
+    try { 
+      info = await ytdlp(youtubeUrl,{ dumpJson: true }); 
+    } catch(err) { 
+      console.warn('yt-dlp failed, using fallback:', err.message);
+      info = await fetchVideoInfoFallback(videoId);
+    }
 
     const title = info.title || 'No title';
-    const description = (info.description || 'No description').replace(/https?:\/\/\S+/g,'').replace(/#\w+/g,'').split('\n').filter(l=>l.trim()).join('\n');
-    
+    const description = (info.description || 'No description').replace(/https?:\/\/\S+/g,'').replace(/#\w+/g,'').trim();
+
     // 2️⃣ Fetch subtitles using yt-dlp
     let transcript = [];
     try {
@@ -86,7 +114,10 @@ router.post('/', async (req,res) => {
             const [time,...rest]=line.split('=>');
             if(time && rest.length) finalTranscript.push({ time: time.trim(), text: rest.join('=>').trim() });
           });
-        }catch(err){ console.error('Gemini cleanup failed:', err.message); }
+        } catch(err){ 
+          console.error('Gemini cleanup failed:', err.message);
+          finalTranscript.push(...transcript); // fallback
+        }
       } else finalTranscript = transcript;
     }
 
@@ -101,14 +132,17 @@ router.post('/', async (req,res) => {
             const [time,...rest]=line.split('=>');
             if(time && rest.length) translatedTranscript.push({ time: time.trim(), text: rest.join('=>').trim() });
           });
-        }catch(err){ console.error(`Translation failed: ${err.message}`); }
+        } catch(err){ console.error(`Translation failed: ${err.message}`); }
       }
       finalTranscript = translatedTranscript;
     }
 
     res.json({ title, description, transcript: finalTranscript });
 
-  } catch(err){ console.error(err); res.status(500).json({ error: err.message }); }
+  } catch(err){
+    console.error('Unexpected server error:', err);
+    res.status(500).json({ error: 'Server error occurred', details: err.message });
+  }
 });
 
 module.exports = router;
