@@ -2,113 +2,196 @@
 const express = require('express');
 const ytdlp = require('yt-dlp-exec');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = (...args) =>
+  import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const router = express.Router();
+
+// Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
 
-// Helpers
-function formatTimestamp(seconds) {
-  const total = Math.floor(seconds);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  return h > 0
-    ? `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
-    : `${m}:${s.toString().padStart(2,'0')}`;
+/* -------------------- HELPERS -------------------- */
+
+// Proper WEBVTT parser
+function parseVTT(vtt) {
+  return vtt
+    .split('\n')
+    .reduce((acc, line) => {
+      if (line.includes('-->')) {
+        acc.push({
+          time: line.split('-->')[0].trim(),
+          text: ''
+        });
+      } else if (line.trim() && acc.length) {
+        acc[acc.length - 1].text += ' ' + line.trim();
+      }
+      return acc;
+    }, [])
+    .filter(item => item.text.trim());
 }
 
-function chunkTranscript(segments, maxChars = 5000) {
+// Chunk transcript for Gemini limits
+function chunkTranscript(segments, maxChars = 4500) {
   const chunks = [];
-  let current = [];
-  let size = 0;
+  let current = '';
   for (const seg of segments) {
     const line = `${seg.time} => ${seg.text}\n`;
-    if (size + line.length > maxChars) {
-      chunks.push(current.join(''));
-      current = [];
-      size = 0;
+    if (current.length + line.length > maxChars) {
+      chunks.push(current);
+      current = '';
     }
-    current.push(line);
-    size += line.length;
+    current += line;
   }
-  if (current.length) chunks.push(current.join(''));
+  if (current) chunks.push(current);
   return chunks;
 }
 
-// POST /tubetwo
-router.post('/', async (req,res) => {
+/* -------------------- ROUTE -------------------- */
+
+router.post('/', async (req, res) => {
   try {
     const { youtubeUrl, language = 'English', applyCleaning = true } = req.body;
-    if (!youtubeUrl) return res.status(400).json({ error: 'YouTube URL required' });
 
-    const videoId = youtubeUrl.split('v=')[1]?.split('&')[0];
-    if (!videoId) return res.status(400).json({ error: 'Invalid YouTube URL' });
+    if (!youtubeUrl) {
+      return res.status(400).json({ error: 'YouTube URL required' });
+    }
 
-    // 1️⃣ Fetch video info
+    /* -------- 1️⃣ Fetch Video Info -------- */
     let info;
-    try { info = await ytdlp(youtubeUrl,{ dumpJson: true }); } 
-    catch(err){ console.error('Video info fetch error:', err); return res.status(500).json({error:'Failed to fetch video info'}); }
+    try {
+      info = await ytdlp(youtubeUrl, { dumpJson: true });
+    } catch (err) {
+      console.error('yt-dlp info error:', err.message);
+      return res.status(500).json({
+        title: 'Video info unavailable',
+        description: 'No description',
+        transcript: []
+      });
+    }
 
     const title = info.title || 'No title';
-    const description = (info.description || 'No description').replace(/https?:\/\/\S+/g,'').replace(/#\w+/g,'').split('\n').filter(l=>l.trim()).join('\n');
-    
-    // 2️⃣ Fetch subtitles using yt-dlp
+    const description = (info.description || '')
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/#\w+/g, '')
+      .split('\n')
+      .filter(Boolean)
+      .join('\n');
+
+    /* -------- 2️⃣ Fetch Captions -------- */
     let transcript = [];
+
     try {
-      const subInfo = await ytdlp(youtubeUrl,{ skipDownload:true, writeAutoSub:true, subLang:'en', dumpSingleJson:true });
-      const subsUrl = subInfo.requested_subtitles?.en?.url;
-      if(subsUrl){
-        const res = await fetch(subsUrl);
-        const text = await res.text();
-        transcript = text.split('\n\n').map(block=>{
-          const lines = block.split('\n');
-          if(lines.length>=2) return { time: lines[0].includes('-->')?lines[0].split('-->')[0].trim():'', text: lines.slice(1).join(' ') };
-          return null;
-        }).filter(Boolean);
+      const subInfo = await ytdlp(youtubeUrl, {
+        skipDownload: true,
+        writeAutoSub: true,
+        subLang: 'en',
+        dumpSingleJson: true
+      });
+
+      const subsUrl = subInfo?.requested_subtitles?.en?.url;
+
+      if (subsUrl) {
+        const r = await fetch(subsUrl);
+        const vtt = await r.text();
+        transcript = parseVTT(vtt);
       }
-    } catch(err){ console.warn('yt-dlp subtitles fetch failed:', err.message); }
+    } catch (err) {
+      console.warn('Subtitle fetch failed:', err.message);
+    }
 
-    if(transcript.length===0) transcript=[{time:'', text:'[No transcript available]'}];
+    /* -------- 3️⃣ No captions → return clean response -------- */
+    if (!transcript.length) {
+      return res.json({
+        title,
+        description,
+        transcript: [],
+        warning: 'No captions available for this video'
+      });
+    }
 
-    // 3️⃣ Clean / Translate with Gemini AI
-    let finalTranscript = [];
-    const chunks = chunkTranscript(transcript);
+    /* -------- 4️⃣ Gemini Cleaning (ONLY real captions) -------- */
+    let finalTranscript = transcript;
 
-    for(const chunk of chunks){
-      if(applyCleaning){
-        try{
-          const cleanupPrompt = `You are a professional subtitle editor fluent in ${language}. Fix grammar and punctuation ONLY. Keep timestamps. Format: timestamp => sentence. Transcript:\n${chunk}`;
-          const result = await model.generateContent(cleanupPrompt);
+    if (applyCleaning) {
+      finalTranscript = [];
+      const chunks = chunkTranscript(transcript);
+
+      for (const chunk of chunks) {
+        const prompt = `
+You are a subtitle editor.
+Fix grammar and punctuation ONLY.
+Do NOT add or remove content.
+Keep timestamps exactly.
+Format: timestamp => sentence
+
+${chunk}
+`;
+        try {
+          const result = await model.generateContent(prompt);
           const cleaned = result.response.text();
-          cleaned.split('\n').forEach(line=>{
-            const [time,...rest]=line.split('=>');
-            if(time && rest.length) finalTranscript.push({ time: time.trim(), text: rest.join('=>').trim() });
-          });
-        }catch(err){ console.error('Gemini cleanup failed:', err.message); }
-      } else finalTranscript = transcript;
-    }
 
-    if(language !== 'English' && finalTranscript.length>0){
-      const translatedTranscript = [];
-      for(const chunk of chunkTranscript(finalTranscript)){
-        try{
-          const translatePrompt = `You are a precise translator. Translate into ${language}, do NOT skip/add words. Preserve timestamps exactly. Transcript:\n${chunk}`;
-          const result = await model.generateContent(translatePrompt);
-          const translated = result.response.text();
-          translated.split('\n').forEach(line=>{
-            const [time,...rest]=line.split('=>');
-            if(time && rest.length) translatedTranscript.push({ time: time.trim(), text: rest.join('=>').trim() });
+          cleaned.split('\n').forEach(line => {
+            const [time, ...rest] = line.split('=>');
+            if (time && rest.length) {
+              finalTranscript.push({
+                time: time.trim(),
+                text: rest.join('=>').trim()
+              });
+            }
           });
-        }catch(err){ console.error(`Translation failed: ${err.message}`); }
+        } catch (err) {
+          console.error('Gemini cleanup error:', err.message);
+        }
       }
-      finalTranscript = translatedTranscript;
     }
 
-    res.json({ title, description, transcript: finalTranscript });
+    /* -------- 5️⃣ Translation (optional) -------- */
+    if (language !== 'English') {
+      const translated = [];
+      const chunks = chunkTranscript(finalTranscript);
 
-  } catch(err){ console.error(err); res.status(500).json({ error: err.message }); }
+      for (const chunk of chunks) {
+        const prompt = `
+Translate to ${language}.
+Do NOT change meaning.
+Preserve timestamps exactly.
+Format: timestamp => sentence
+
+${chunk}
+`;
+        try {
+          const result = await model.generateContent(prompt);
+          const text = result.response.text();
+
+          text.split('\n').forEach(line => {
+            const [time, ...rest] = line.split('=>');
+            if (time && rest.length) {
+              translated.push({
+                time: time.trim(),
+                text: rest.join('=>').trim()
+              });
+            }
+          });
+        } catch (err) {
+          console.error('Translation error:', err.message);
+        }
+      }
+
+      finalTranscript = translated;
+    }
+
+    /* -------- 6️⃣ Final Response -------- */
+    res.json({
+      title,
+      description,
+      transcript: finalTranscript
+    });
+
+  } catch (err) {
+    console.error('Server error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 module.exports = router;
