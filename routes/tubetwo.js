@@ -1,4 +1,3 @@
-// routes/tubetwo.js
 const express = require('express');
 const ytdlp = require('yt-dlp-exec');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -7,34 +6,38 @@ const fetch = (...args) =>
 
 const router = express.Router();
 
-// Gemini
+/* -------------------- GEMINI -------------------- */
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
 
 /* -------------------- HELPERS -------------------- */
 
-// Proper WEBVTT parser
+// Robust WEBVTT parser
 function parseVTT(vtt) {
-  return vtt
-    .split('\n')
-    .reduce((acc, line) => {
-      if (line.includes('-->')) {
-        acc.push({
-          time: line.split('-->')[0].trim(),
-          text: ''
-        });
-      } else if (line.trim() && acc.length) {
-        acc[acc.length - 1].text += ' ' + line.trim();
-      }
-      return acc;
-    }, [])
-    .filter(item => item.text.trim());
+  const blocks = vtt.split('\n\n');
+
+  return blocks
+    .map(block => {
+      const lines = block.split('\n').map(l => l.trim());
+      const timeLine = lines.find(l => l.includes('-->'));
+      if (!timeLine) return null;
+
+      const time = timeLine.split('-->')[0].trim();
+      const text = lines
+        .filter(l => l && !l.includes('-->') && !l.startsWith('WEBVTT'))
+        .join(' ')
+        .trim();
+
+      return text ? { time, text } : null;
+    })
+    .filter(Boolean);
 }
 
-// Chunk transcript for Gemini limits
+// Chunk transcript for Gemini token limits
 function chunkTranscript(segments, maxChars = 4500) {
   const chunks = [];
   let current = '';
+
   for (const seg of segments) {
     const line = `${seg.time} => ${seg.text}\n`;
     if (current.length + line.length > maxChars) {
@@ -43,6 +46,7 @@ function chunkTranscript(segments, maxChars = 4500) {
     }
     current += line;
   }
+
   if (current) chunks.push(current);
   return chunks;
 }
@@ -57,16 +61,17 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'YouTube URL required' });
     }
 
-    /* -------- 1️⃣ Fetch Video Info -------- */
+    /* -------- 1️⃣ VIDEO INFO -------- */
     let info;
     try {
       info = await ytdlp(youtubeUrl, { dumpJson: true });
     } catch (err) {
       console.error('yt-dlp info error:', err.message);
-      return res.status(500).json({
+      return res.json({
         title: 'Video info unavailable',
-        description: 'No description',
-        transcript: []
+        description: '',
+        transcript: [],
+        warning: 'Unable to fetch video metadata'
       });
     }
 
@@ -78,21 +83,23 @@ router.post('/', async (req, res) => {
       .filter(Boolean)
       .join('\n');
 
-    /* -------- 2️⃣ Fetch Captions -------- */
+    /* -------- 2️⃣ CAPTION FETCH -------- */
     let transcript = [];
 
     try {
       const subInfo = await ytdlp(youtubeUrl, {
         skipDownload: true,
-        writeAutoSub: true,
-        subLang: 'en',
+        writeAutoSubs: true,
+        writeSubs: true,
+        subFormat: 'vtt',
         dumpSingleJson: true
       });
 
-      const subsUrl = subInfo?.requested_subtitles?.en?.url;
+      const subs = subInfo?.requested_subtitles || {};
+      const firstLang = Object.keys(subs)[0];
 
-      if (subsUrl) {
-        const r = await fetch(subsUrl);
+      if (firstLang && subs[firstLang]?.url) {
+        const r = await fetch(subs[firstLang].url);
         const vtt = await r.text();
         transcript = parseVTT(vtt);
       }
@@ -100,7 +107,7 @@ router.post('/', async (req, res) => {
       console.warn('Subtitle fetch failed:', err.message);
     }
 
-    /* -------- 3️⃣ No captions → return clean response -------- */
+    /* -------- 3️⃣ NO CAPTIONS -------- */
     if (!transcript.length) {
       return res.json({
         title,
@@ -110,7 +117,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    /* -------- 4️⃣ Gemini Cleaning (ONLY real captions) -------- */
+    /* -------- 4️⃣ GEMINI CLEANUP -------- */
     let finalTranscript = transcript;
 
     if (applyCleaning) {
@@ -119,14 +126,14 @@ router.post('/', async (req, res) => {
 
       for (const chunk of chunks) {
         const prompt = `
-You are a subtitle editor.
-Fix grammar and punctuation ONLY.
-Do NOT add or remove content.
-Keep timestamps exactly.
+Fix grammar and punctuation only.
+Do NOT any content change content.
+Keep timestamps exactly what in this video.
 Format: timestamp => sentence
 
 ${chunk}
-`;
+        `.trim();
+
         try {
           const result = await model.generateContent(prompt);
           const cleaned = result.response.text();
@@ -146,7 +153,7 @@ ${chunk}
       }
     }
 
-    /* -------- 5️⃣ Translation (optional) -------- */
+    /* -------- 5️⃣ TRANSLATION -------- */
     if (language !== 'English') {
       const translated = [];
       const chunks = chunkTranscript(finalTranscript);
@@ -154,12 +161,13 @@ ${chunk}
       for (const chunk of chunks) {
         const prompt = `
 Translate to ${language}.
-Do NOT change meaning.
-Preserve timestamps exactly.
+Do NOT any content change content.
+Keep timestamps exactly what in this video.
 Format: timestamp => sentence
 
 ${chunk}
-`;
+        `.trim();
+
         try {
           const result = await model.generateContent(prompt);
           const text = result.response.text();
@@ -181,7 +189,7 @@ ${chunk}
       finalTranscript = translated;
     }
 
-    /* -------- 6️⃣ Final Response -------- */
+    /* -------- 6️⃣ RESPONSE -------- */
     res.json({
       title,
       description,
