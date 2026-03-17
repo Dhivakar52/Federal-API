@@ -1,3 +1,5 @@
+require("dotenv").config()
+
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -80,6 +82,7 @@ app.use("/", employeeLogin);
 app.use('/opinion', opinionRouter);
 app.use('/editorial', editorialRouter);
 app.use('/reset-password', resetPassword);
+// app.use('/tubesrcipt', tubeTwoRoutes);
 app.use('/tubetwo', tubeTwoRoutes);
 
 app.use('/translate', translateRouter);

@@ -7,7 +7,7 @@ dotenv.config();
 const router = express.Router();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-router.post('/generate-news', async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { title, description, transcript, language } = req.body;
 
@@ -30,7 +30,7 @@ BODY: (article)
 HASHTAGS: (hashtags)`;
 
     // Initialize Gemini model
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Generate content
     const result = await model.generateContent({
