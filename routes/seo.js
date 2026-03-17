@@ -137,7 +137,7 @@ router.post("/", async (req, res) => {
 
   try {
     // Initialize Gemini model
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
     // Generate SEO analysis content
     const result = await model.generateContent(finalPrompt);
