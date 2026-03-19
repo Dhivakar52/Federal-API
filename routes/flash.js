@@ -31,7 +31,7 @@ async function scrapeContent(url) {
 }
 
 // Flashcard generation function (Gemini)
-async function createFlashcards(content) {
+async function createFlashcards(content , language = "English") {
   try {
     const prompt = process.env.FLASHCARD_PROMPT;
 
@@ -39,8 +39,24 @@ async function createFlashcards(content) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Gemini takes plain text instead of role-based messages
-      const inputText = `
-         ${prompt}
+//       const inputText = `
+//          ${prompt}
+
+// Here is the article content:
+// ${content}
+// `;
+
+const inputText = `
+You are an expert educator.
+
+⚠️ VERY STRICT LANGUAGE RULE:
+- Generate flashcards ONLY in ${language}
+- Do NOT mix English unless selected
+- Translate EVERYTHING (questions, answers)
+
+----------------------------
+
+${prompt}
 
 Here is the article content:
 ${content}
@@ -61,8 +77,8 @@ ${content}
 
 // API endpoint
 router.post("/", async (req, res) => {
-  const { url } = req.body;
-  console.log(url);
+  const { url , language } = req.body;
+  console.log(url , language);
 
   if (!url) return res.status(400).json({ error: "URL is required" });
 
@@ -70,7 +86,7 @@ router.post("/", async (req, res) => {
     const { title, content } = await scrapeContent(url);
     console.log(title, content);
 
-    const flashcards = await createFlashcards(content);
+ const flashcards = await createFlashcards(content, language);
     res.json({ title, flashcards });
   } catch (error) {
     res.status(500).json({ error: error.message, stack: error.stack });

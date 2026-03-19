@@ -123,7 +123,9 @@ async function extractArticle(url) {
 
 // 📡 Main API endpoint
 router.post("/", async (req, res) => {
-  const { url, promptType } = req.body;
+  const { url, promptType, language  } = req.body;
+
+  console.log("Received SEO request for URL:",  url , language , promptType);
 
   const content = await extractArticle(url);
   console.log("Extracted content length:", content);
@@ -133,7 +135,21 @@ router.post("/", async (req, res) => {
   }
 
   const template = seoPromptTemplates[promptType] || `Analyze this article:\n\n{content}`;
-  const finalPrompt = template.replace("{content}", content);
+  const basePrompt = template.replace("{content}", content);
+ 
+const finalPrompt = `
+You are an expert SEO analyst.
+
+⚠️ VERY IMPORTANT INSTRUCTION:
+- The entire response MUST be written ONLY in ${language || "English"}
+- Do NOT use English unless the selected language is English
+- Translate everything including headings, bullets, and structure
+- Maintain professional tone in ${language}
+
+----------------------------
+
+${basePrompt}
+`;
 
   try {
     // Initialize Gemini model

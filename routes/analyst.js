@@ -37,7 +37,8 @@ const extractArticleText = async (url) => {
 };
 
 router.post("/", async (req, res) => {
-  const { url } = req.body;
+  const { url , language  } = req.body;
+  console.log(language, url)
 
   console.log("Received URL:", url);
 
@@ -52,7 +53,22 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const prompt = USER_NEEDS_PROMPT.replace("{story}", article.slice(0, 3000));
+  // const prompt = USER_NEEDS_PROMPT.replace("{story}", article.slice(0, 3000));
+  const basePrompt = USER_NEEDS_PROMPT.replace("{story}", article.slice(0, 3000));
+
+const prompt = `
+You are a professional news analyst.
+
+⚠️ STRICT LANGUAGE RULE:
+- The entire response MUST be ONLY in ${language || "English"}
+- Do NOT use English unless selected
+- Translate ratings, headings, explanations everything
+- Maintain clarity and structured format
+
+----------------------------
+
+${basePrompt}
+`;
 
   try {
     console.log("Sending prompt to Gemini...");
