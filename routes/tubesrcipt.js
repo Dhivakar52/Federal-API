@@ -30,7 +30,7 @@ BODY: (article)
 HASHTAGS: (hashtags)`;
 
     // Initialize Gemini model
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview", });
 
     // Generate content
     const result = await model.generateContent({
