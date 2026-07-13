@@ -74,7 +74,7 @@ ${basePrompt}
     console.log("Sending prompt to Gemini...");
 
     // Correct Gemini call
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
     const result = await model.generateContent(prompt);
 
     const text = result.response.text();

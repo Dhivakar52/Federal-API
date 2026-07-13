@@ -1,39 +1,55 @@
+// routes/userAdd.js
 const express = require('express');
 const router = express.Router();
-
-const Employee = require("../models/Employee");
+const { UserModel } = require('../models/supabaseClient');
 
 router.post('/', async (req, res) => {
   try {
-   const { name, email, password, role = 'user' } = req.body;
+    const { name, email, password, role = 'user', designation = null } = req.body;
 
-
+    // Validation
     if (!name || !email || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'All fields are required' 
+      });
     }
 
     // Check if user already exists
-    const existingUser = await Employee.findOne({ email });
+    const existingUser = await UserModel.findByEmail(email);
     if (existingUser) {
-      return res.status(409).json({ message: 'User already exists' });
+      return res.status(409).json({ 
+        success: false,
+        message: 'User already exists' 
+      });
     }
 
-
-
-    const newUser = new Employee({
-      name,
-      email,
-      loginId: email,
-      passwordHash: password,
-      role,
-      createdAt: new Date()
+    // Create new user
+    const newUser = await UserModel.create({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      loginId: email.toLowerCase().trim(),
+      password: password,
+      role: role || 'user',
+      designation: designation || null
     });
 
-    await newUser.save();
-    res.status(201).json(newUser);
+    // Remove password hash
+    delete newUser.password_hash;
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      user: newUser
+    });
+
   } catch (error) {
     console.error('Create user error:', error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server Error', 
+      error: error.message 
+    });
   }
 });
 

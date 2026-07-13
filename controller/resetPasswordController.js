@@ -1,26 +1,68 @@
-const bcrypt = require("bcryptjs");
-const Employee = require("../models/Employee");
+const { UserModel } = require('../models/supabaseClient');
 
 exports.resetPassword = async (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
 
   try {
-    const user = await Employee.findOne({ email });
+    // Validation
+    if (!email || !oldPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, old password, and new password are required"
+      });
+    }
 
+    // Validate new password strength
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 6 characters long"
+      });
+    }
+
+    // Find user by email
+    const user = await UserModel.findByEmail(email.toLowerCase().trim());
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
     }
 
-    const isMatch = await bcrypt.compare(oldPassword, user.passwordHash);
+    // Verify old password
+    const isMatch = await UserModel.comparePassword(oldPassword, user.password_hash);
     if (!isMatch) {
-      return res.status(400).json({ message: "Old password is incorrect" });
+      return res.status(400).json({
+        success: false,
+        message: "Old password is incorrect"
+      });
     }
 
-    user.passwordHash = newPassword; 
-    await user.save();
+    // Update password (this will automatically hash it)
+    const updatedUser = await UserModel.update(user.id, {
+      password: newPassword // ✅ This will be hashed in the update method
+    });
 
-    res.json({ message: "Password updated successfully" });
+    // Remove sensitive data
+    delete updatedUser.password_hash;
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        lastLogin: updatedUser.last_login
+      }
+    });
+
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Reset password error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
+    });
   }
 };
