@@ -1,15 +1,15 @@
+// routes/register.js - UPDATED
+
 const express = require('express');
 const { UserModel } = require('../models/supabaseClient');
 
 const router = express.Router();
 
-// Register route (Signup)
 router.post('/', async (req, res) => {
   const { name, email, password, role, designation } = req.body;
   console.log('Registration attempt:', { name, email });
 
   try {
-    // Validation
     if (!name || !email || !password) {
       return res.status(400).json({ 
         success: false,
@@ -17,7 +17,6 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ 
@@ -26,7 +25,6 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Password strength validation
     if (password.length < 6) {
       return res.status(400).json({ 
         success: false,
@@ -34,7 +32,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // ✅ Check if user already exists by email only
     const existingUser = await UserModel.findByEmail(email);
     if (existingUser) {
       return res.status(409).json({ 
@@ -43,26 +41,15 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Check if loginId (email as loginId) is taken
-    const existingLoginId = await UserModel.findByLoginId(email);
-    if (existingLoginId) {
-      return res.status(409).json({ 
-        success: false,
-        message: 'Login ID already exists' 
-      });
-    }
-
-    // Create new user
+    // ✅ Create new user (loginId removed)
     const newUser = await UserModel.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
-      loginId: email.toLowerCase().trim(), // Using email as loginId
       password: password,
       role: role || 'user',
       designation: designation || null
     });
 
-    // Remove password hash from response
     delete newUser.password_hash;
 
     console.log('User registered successfully:', newUser.email);
@@ -74,7 +61,6 @@ router.post('/', async (req, res) => {
         id: newUser.id,
         name: newUser.name,
         email: newUser.email,
-        loginId: newUser.login_id,
         role: newUser.role,
         designation: newUser.designation,
         createdAt: newUser.created_at
@@ -84,11 +70,10 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('Error during registration:', err);
     
-    // Handle specific Supabase errors
-    if (err.code === '23505') { // Unique violation
+    if (err.code === '23505') {
       return res.status(409).json({ 
         success: false,
-        message: 'Email or Login ID already exists' 
+        message: 'Email already exists' 
       });
     }
 

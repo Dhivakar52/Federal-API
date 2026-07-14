@@ -1,4 +1,5 @@
-// routes/userAdd.js
+// routes/userAdd.js - UPDATED
+
 const express = require('express');
 const router = express.Router();
 const { UserModel } = require('../models/supabaseClient');
@@ -7,7 +8,6 @@ router.post('/', async (req, res) => {
   try {
     const { name, email, password, role = 'user', designation = null } = req.body;
 
-    // Validation
     if (!name || !email || !password) {
       return res.status(400).json({ 
         success: false,
@@ -15,7 +15,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Check if user already exists
+    // ✅ Check by email only
     const existingUser = await UserModel.findByEmail(email);
     if (existingUser) {
       return res.status(409).json({ 
@@ -24,17 +24,15 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Create new user
+
     const newUser = await UserModel.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
-      loginId: email.toLowerCase().trim(),
       password: password,
       role: role || 'user',
       designation: designation || null
     });
 
-    // Remove password hash
     delete newUser.password_hash;
 
     res.status(201).json({

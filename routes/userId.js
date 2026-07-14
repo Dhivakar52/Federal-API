@@ -21,7 +21,7 @@ router.put('/:id', async (req, res) => {
     const updateData = {
       name: req.body.name,
       email: req.body.email,
-      login_id: req.body.email, // Using email as loginId
+     
       role: req.body.role,
       designation: req.body.designation || user.designation
     };

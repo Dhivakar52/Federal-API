@@ -1,33 +1,27 @@
-// controller/loginController.js
+// controller/loginController.js - UPDATED (Email only)
+
 const jwt = require("jsonwebtoken");
 const { UserModel } = require("../models/supabaseClient");
 
 exports.loginUser = async (req, res) => {
-  const { loginId, password } = req.body;
+  const { email, password } = req.body;  // ✅ Changed from loginId to email
 
   try {
-    console.log('📥 Login attempt:', { loginId });
+    console.log('📥 Login attempt:', { email });
 
-    // Validation
-    if (!loginId || !password) {
+    if (!email || !password) {
       return res.status(400).json({ 
         success: false,
-        message: "Login ID and password are required" 
+        message: "Email and password are required" 
       });
     }
 
-    // Find user by loginId
-    let user = await UserModel.findByLoginId(loginId.trim());
-    console.log('  Search by login_id:', user ? '✅ Found' : '❌ Not found');
-    
-    // If not found, try email
-    if (!user) {
-      user = await UserModel.findByEmail(loginId.trim());
-      console.log('  Search by email:', user ? '✅ Found' : '❌ Not found');
-    }
+    // ✅ Find user by email only
+    const user = await UserModel.findByEmail(email.trim());
+    console.log('  Search by email:', user ? '✅ Found' : '❌ Not found');
 
     if (!user) {
-      console.log('❌ User not found:', loginId);
+      console.log('❌ User not found:', email);
       return res.status(401).json({ 
         success: false,
         message: "Invalid credentials" 
@@ -38,11 +32,9 @@ exports.loginUser = async (req, res) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      login_id: user.login_id,
       hasPassword: !!user.password_hash
     });
 
-    // Check if password_hash exists
     if (!user.password_hash) {
       console.error('❌ No password_hash for user:', user.email);
       return res.status(500).json({
@@ -51,8 +43,6 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    // Compare password
-    console.log('🔐 Comparing password...');
     const isMatch = await UserModel.comparePassword(password, user.password_hash);
     console.log('  Password match:', isMatch ? '✅ Yes' : '❌ No');
 
@@ -63,15 +53,12 @@ exports.loginUser = async (req, res) => {
       });
     }
 
-    // Update last login
     await UserModel.updateLastLogin(user.id);
 
-    // Create JWT
     const payload = {
       id: user.id,
       email: user.email,
       name: user.name,
-      loginId: user.login_id,
       role: user.role,
       designation: user.designation
     };
@@ -94,7 +81,6 @@ exports.loginUser = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        loginId: user.login_id,
         role: user.role,
         designation: user.designation,
         lastLogin: user.last_login

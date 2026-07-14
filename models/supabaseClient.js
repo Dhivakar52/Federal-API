@@ -1,4 +1,4 @@
-// models/supabaseClient.js - COMPLETE VERSION
+// models/supabaseClient.js - UPDATED (Login ID removed)
 
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
@@ -16,9 +16,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 class UserModel {
   
-  // Create new user
+  // ✅ Create new user - login_id removed, using email only
   static async create(userData) {
-    const { name, email, loginId, password, role = 'user', designation = null } = userData;
+    const { name, email, password, role = 'user', designation = null } = userData;
     
     try {
       const salt = await bcrypt.genSalt(10);
@@ -29,7 +29,7 @@ class UserModel {
         .insert({
           name: name.trim(),
           email: email.toLowerCase().trim(),
-          login_id: loginId.trim(),
+          // ❌ login_id removed
           password_hash: passwordHash,
           role: role || 'user',
           designation: designation || null
@@ -45,7 +45,7 @@ class UserModel {
     }
   }
   
-  // Find user by email
+  // ✅ Find user by email (Primary method)
   static async findByEmail(email) {
     try {
       console.log('  [DB] Finding by email:', email);
@@ -67,27 +67,7 @@ class UserModel {
     }
   }
   
-  // Find user by loginId
-  static async findByLoginId(loginId) {
-    try {
-      console.log('  [DB] Finding by login_id:', loginId);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('login_id', loginId.toLowerCase().trim())
-        .maybeSingle();
-      
-      if (error) {
-        console.error('  [DB] Error:', error.message);
-        return null;
-      }
-      console.log('  [DB] Found:', data ? '✅ Yes' : '❌ No');
-      return data;
-    } catch (error) {
-      console.error('❌ FindByLoginId error:', error);
-      return null;
-    }
-  }
+  // ❌ Remove findByLoginId - Not needed anymore
   
   // Find user by ID
   static async findById(id) {
@@ -118,10 +98,11 @@ class UserModel {
         delete updates.password;
       }
       
-      if (updates.loginId) {
-        updates.login_id = updates.loginId;
-        delete updates.loginId;
-      }
+      // ❌ Remove loginId conversion
+      // if (updates.loginId) {
+      //   updates.login_id = updates.loginId;
+      //   delete updates.loginId;
+      // }
       
       const { data, error } = await supabase
         .from('users')
@@ -138,7 +119,7 @@ class UserModel {
     }
   }
   
-  // ✅ Update last login - ADD THIS
+  // Update last login
   static async updateLastLogin(id) {
     try {
       const { data, error } = await supabase
@@ -156,7 +137,7 @@ class UserModel {
     }
   }
   
-  // ✅ Update last logout - ADD THIS
+  // Update last logout
   static async updateLastLogout(id) {
     try {
       const { data, error } = await supabase
@@ -212,7 +193,7 @@ class UserModel {
         .select('*', { count: 'exact' });
       
       if (search) {
-        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,login_id.ilike.%${search}%`);
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       }
       
       const start = (page - 1) * limit;
