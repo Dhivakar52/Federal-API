@@ -1,14 +1,10 @@
 const express = require('express');
 const ytdlp = require('yt-dlp-exec');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { getGeminiModel, getCurrentModelName } = require('../constants/gemini'); // ✅ Import from constants
 const fetch = (...args) =>
   import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const router = express.Router();
-
-/* -------------------- GEMINI -------------------- */
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-001' });
 
 /* -------------------- HELPERS -------------------- */
 
@@ -51,6 +47,95 @@ function chunkTranscript(segments, maxChars = 4500) {
   return chunks;
 }
 
+/* ================= CLEANUP FUNCTION ================= */
+async function cleanupTranscript(transcript, language, model) {
+  let finalTranscript = transcript;
+
+  // ✅ Cleanup (if enabled)
+  if (language !== 'English') {
+    const translated = [];
+    const chunks = chunkTranscript(finalTranscript);
+
+    for (const chunk of chunks) {
+      const prompt = `
+Translate to ${language}.
+Do NOT change content.
+Keep timestamps exactly as in video.
+Format: timestamp => sentence
+
+${chunk}
+      `.trim();
+
+      try {
+        console.log(`🤖 Translating chunk to ${language}...`);
+        const result = await model.generateContent(prompt);
+        const text = result.response.text();
+
+        text.split('\n').forEach(line => {
+          const [time, ...rest] = line.split('=>');
+          if (time && rest.length) {
+            translated.push({
+              time: time.trim(),
+              text: rest.join('=>').trim()
+            });
+          }
+        });
+      } catch (err) {
+        console.error('Translation error:', err.message);
+      }
+    }
+
+    finalTranscript = translated;
+  }
+
+  return finalTranscript;
+}
+
+/* ================= CHUNK CLEANUP ================= */
+async function processChunks(transcript, model, action = 'clean') {
+  const processed = [];
+  const chunks = chunkTranscript(transcript);
+
+  for (const chunk of chunks) {
+    const prompt = action === 'clean' 
+      ? `
+Fix grammar and punctuation only.
+Do NOT change content.
+Keep timestamps exactly as in video.
+Format: timestamp => sentence
+
+${chunk}
+      `.trim()
+      : `
+Translate to ${action}.
+Do NOT change content.
+Keep timestamps exactly as in video.
+Format: timestamp => sentence
+
+${chunk}
+      `.trim();
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+
+      text.split('\n').forEach(line => {
+        const [time, ...rest] = line.split('=>');
+        if (time && rest.length) {
+          processed.push({
+            time: time.trim(),
+            text: rest.join('=>').trim()
+          });
+        }
+      });
+    } catch (err) {
+      console.error('Processing error:', err.message);
+    }
+  }
+
+  return processed;
+}
+
 /* -------------------- ROUTE -------------------- */
 
 router.post('/', async (req, res) => {
@@ -58,8 +143,14 @@ router.post('/', async (req, res) => {
     const { youtubeUrl, language = 'English', applyCleaning = true } = req.body;
 
     if (!youtubeUrl) {
-      return res.status(400).json({ error: 'YouTube URL required' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'YouTube URL required' 
+      });
     }
+
+    console.log(`📥 YouTube URL: ${youtubeUrl}`);
+    console.log(`🌐 Target Language: ${language}`);
 
     /* -------- 1️⃣ VIDEO INFO -------- */
     let info;
@@ -68,6 +159,7 @@ router.post('/', async (req, res) => {
     } catch (err) {
       console.error('yt-dlp info error:', err.message);
       return res.json({
+        success: false,
         title: 'Video info unavailable',
         description: '',
         transcript: [],
@@ -82,6 +174,8 @@ router.post('/', async (req, res) => {
       .split('\n')
       .filter(Boolean)
       .join('\n');
+
+    console.log(`📄 Video Title: ${title}`);
 
     /* -------- 2️⃣ CAPTION FETCH -------- */
     let transcript = [];
@@ -102,6 +196,7 @@ router.post('/', async (req, res) => {
         const r = await fetch(subs[firstLang].url);
         const vtt = await r.text();
         transcript = parseVTT(vtt);
+        console.log(`✅ Found ${transcript.length} caption segments`);
       }
     } catch (err) {
       console.warn('Subtitle fetch failed:', err.message);
@@ -110,6 +205,7 @@ router.post('/', async (req, res) => {
     /* -------- 3️⃣ NO CAPTIONS -------- */
     if (!transcript.length) {
       return res.json({
+        success: false,
         title,
         description,
         transcript: [],
@@ -117,88 +213,48 @@ router.post('/', async (req, res) => {
       });
     }
 
-    /* -------- 4️⃣ GEMINI CLEANUP -------- */
+    /* -------- 4️⃣ GET MODEL FROM DATABASE -------- */
+    const model = await getGeminiModel();
+    const modelName = await getCurrentModelName();
+
+    console.log(`🤖 Using model: ${modelName}`);
+
+    /* -------- 5️⃣ GEMINI CLEANUP -------- */
     let finalTranscript = transcript;
 
     if (applyCleaning) {
-      finalTranscript = [];
-      const chunks = chunkTranscript(transcript);
-
-      for (const chunk of chunks) {
-        const prompt = `
-Fix grammar and punctuation only.
-Do NOT any content change content.
-Keep timestamps exactly what in this video.
-Format: timestamp => sentence
-
-${chunk}
-        `.trim();
-
-        try {
-          const result = await model.generateContent(prompt);
-          const cleaned = result.response.text();
-
-          cleaned.split('\n').forEach(line => {
-            const [time, ...rest] = line.split('=>');
-            if (time && rest.length) {
-              finalTranscript.push({
-                time: time.trim(),
-                text: rest.join('=>').trim()
-              });
-            }
-          });
-        } catch (err) {
-          console.error('Gemini cleanup error:', err.message);
-        }
-      }
+      console.log('🧹 Cleaning transcript...');
+      finalTranscript = await processChunks(transcript, model, 'clean');
+      console.log(`✅ Cleaned ${finalTranscript.length} segments`);
     }
 
-    /* -------- 5️⃣ TRANSLATION -------- */
+    /* -------- 6️⃣ TRANSLATION -------- */
     if (language !== 'English') {
-      const translated = [];
-      const chunks = chunkTranscript(finalTranscript);
-
-      for (const chunk of chunks) {
-        const prompt = `
-Translate to ${language}.
-Do NOT any content change content.
-Keep timestamps exactly what in this video.
-Format: timestamp => sentence
-
-${chunk}
-        `.trim();
-
-        try {
-          const result = await model.generateContent(prompt);
-          const text = result.response.text();
-
-          text.split('\n').forEach(line => {
-            const [time, ...rest] = line.split('=>');
-            if (time && rest.length) {
-              translated.push({
-                time: time.trim(),
-                text: rest.join('=>').trim()
-              });
-            }
-          });
-        } catch (err) {
-          console.error('Translation error:', err.message);
-        }
-      }
-
+      console.log(`🌐 Translating to ${language}...`);
+      const translated = await processChunks(finalTranscript, model, language);
       finalTranscript = translated;
+      console.log(`✅ Translated ${finalTranscript.length} segments`);
     }
 
-    /* -------- 6️⃣ RESPONSE -------- */
+    /* -------- 7️⃣ RESPONSE -------- */
     res.json({
+      success: true,
       title,
       description,
-      transcript: finalTranscript
+      transcript: finalTranscript,
+      language: language,
+      model: modelName,
+      totalSegments: finalTranscript.length,
+      timestamp: new Date().toISOString()
     });
 
   } catch (err) {
-    console.error('Server error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('❌ Server error:', err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal Server Error',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 

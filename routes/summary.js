@@ -1,12 +1,9 @@
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { getGeminiModel, getCurrentModelName } = require("../constants/gemini"); // ✅ Import from constants
 
 const router = express.Router();
-
-/* ✅ Gemini init */
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /* ================= LANGUAGE MAP ================= */
 const languagePrompts = {
@@ -26,10 +23,14 @@ router.post("/", async (req, res) => {
   const { url, language } = req.body;
 
   if (!url) {
-    return res.status(400).json({ error: "URL is required" });
+    return res.status(400).json({ 
+      success: false,
+      error: "URL is required" 
+    });
   }
 
   const selectedLanguage = languagePrompts[language] || "in Hindi";
+  const selectedLanguageName = language || "Hindi";
 
   try {
     /* 🔹 Fetch article */
@@ -46,7 +47,10 @@ router.post("/", async (req, res) => {
       .slice(0, 6000); // Gemini-safe length
 
     if (!paragraphs) {
-      return res.status(400).json({ error: "No article content found" });
+      return res.status(400).json({ 
+        success: false,
+        error: "No article content found" 
+      });
     }
 
     /* 🔹 Prompt */
@@ -54,27 +58,40 @@ router.post("/", async (req, res) => {
 Summarize the following news article ${selectedLanguage}.
 Provide full, well-structured content without missing key details.
 
+⚠️ STRICT LANGUAGE RULE:
+- Response MUST be in ${selectedLanguage}
+- Do NOT mix English unless selected
+
 ${paragraphs}
 `;
 
-    /* 🔹 Gemini model */
-    const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
-    });
+    /* 🔹 Get model from database */
+    const model = await getGeminiModel();
+    const modelName = await getCurrentModelName();
+
+    console.log(`🤖 Summarizing article with model: ${modelName}`);
+    console.log(`🌐 Target Language: ${selectedLanguage}`);
+    console.log(`📄 Article Title: ${title}`);
 
     const result = await model.generateContent(prompt);
     const summary = result.response.text();
 
+    console.log(`✅ Summary generated successfully`);
+
     res.json({
+      success: true,
       title,
       summary,
-      language: language || "Hindi",
+      language: selectedLanguageName,
+      model: modelName,  // ✅ Include model name in response
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error("Gemini Summary Error:", error.message);
+    console.error("❌ Gemini Summary Error:", error.message);
     res.status(500).json({
+      success: false,
       error: "Failed to summarize article",
-      details: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
